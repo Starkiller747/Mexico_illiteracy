@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js" integrity="sha256-tHoAPGoNdhIR28YHl9DWLzeRfdwigkH7OCBXMrHXhoM=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js" ></script>
         <script src="https://d3js.org/d3.v7.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
         <title>Mapa de Mexico</title>
@@ -33,31 +33,20 @@ svg{
     box-shadow: 0px 3px 150px rgba(0,0,0,0.2);
     border-radius: 5px;
     border-radius: 5px;
+    position: relative;
+}
+div.tooltip{
+    position:absolute;
 }
 
-#canvas{
+#viz{
     min-height: 600px;
     min-width: 950px;
-}
 
-/* 
-.county:hover{
-    fill: gray;
-}
- */
-g{
-    color: #FDF1E7
-}
-
-#tooltip{
-    opacity: 0;
-    height: auto;
-    width: auto;
-    color: black
-/*     margin-top: 2px;
-    color: #FDF1E7;
-    font-size: 24px;
-    margin-bottom: 5px; */
+    background-color: #305555;
+    box-shadow: 0px 3px 150px rgba(0,0,0,0.2);
+    border-radius: 5px;
+    border-radius: 5px;
 }
 
 #legend{
@@ -69,17 +58,6 @@ g{
     margin: 5px 650px 5px 290px;
 }
 
-path.land {
-    fill: #eee;
-    stroke: #ddd;
-}
-
-path.state {
-    stroke: rgb(0, 0, 0);
-    stroke-width: 20;
-}
-
-
 #title{
     font-size: 28px;
     color: #FDF1E7;
@@ -87,25 +65,27 @@ path.state {
     margin-top: 10px;
     margin-bottom: 15px;
 }
-
+.tooltip {
+  opacity: 1;
+  position: absolute;
+  text-align: left;
+  width: auto;
+  height: auto;
+  padding-top: 10px;
+  padding-right: 10px;
+  padding-left: 10px;
+  font: 12px sans-serif;
+  background: lightsteelblue;
+  border: 0px;
+  border-radius: 8px;
+  pointer-events: none;
+}
 #description a{
     text-decoration: none;
     color: #FDF1E7;
     text-align: center;
 }
 
-#container{
-    display: flex;
-    align-items: center;
-    width: 100%;
-}
-
-#rightSide{
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-left: 50px;
-}
 #source{
     display:flex;
     justify-content:right;
@@ -121,29 +101,30 @@ path.state {
         <h2 id="title">Illiteracy in Mexico</h2>
         <div id="description">Illiteracy status of people 15 and over</div>
         <svg id="legend"></svg>
-        <svg id="canvas"></svg>
+        <svg id="viz"></svg>
         <div id="source">Source: INEGI, Censo de Población y Vivienda 2020.</div>
-        <div id="Tooltip"></div> 
     </body>
     <script>
-        //let mxURL = 'https://gist.githubusercontent.com/mbostock/c4c27dc3724e1ad3d680a581079b2e9c/raw/835560b9dae2b00dcfefdb53f2465c44cbbbcb03/mx.json'
-        //let mxURL = 'https://cdn.freecodecamp.org/testable-projects-fcc/data/choropleth_map/counties.json'
-        //let mxURL = 'https://raw.githubusercontent.com/piwodlaiwo/TopoJSON-Data/master/diva-gis/ESP_adm/ESP_adm1.topo.json'
+        // Data retrieval
         let mxURL = 'https://raw.githubusercontent.com/Traze3/Mexico_illiteracy/main/mx_topojson.json'
         let illitURL = 'https://raw.githubusercontent.com/Traze3/Mexico_illiteracy/main/analfabetismo.csv'
-        //let illitURL = "http://localhost:8888/analfabetismo.csv"
 
-        let mxData
-        let illitData
-
+        // We set the projection to be centered in Mexico and create a path variable to be used in the map creation
         var projection = d3.geoMercator()
-                            .scale(1700)
-                            .center([-102,25.5])
+            .scale(1700)
+            .center([-102,25.5])
+        
+        var path = d3.geoPath().projection(projection)
 
+        // Number format to be used in data display
+        var numFor = Intl.NumberFormat('es-MX')
+
+        // Our function that will be called once the data has been succesfully loaded
         let drawMap = () =>{
 
-            /*In the following part, the maximum and minimum values of the csv are extracted to be used in the domain of our
+            /* In the following part, the maximum and minimum values of the csv are extracted to be used in the domain of our
             color scale function in order to color de states dinamically and based on the entire dataset.*/
+
             var maxData = d3.max(illitData, (d) =>{
                                     return d.Porcentaje_analfabetismo
                                 })
@@ -154,14 +135,16 @@ path.state {
                             .domain([minData,maxData])
                             .range(['white','red'])
                             .interpolate(d3.interpolateRgb)
-
+            
+            // We set a threshold to display the legend in order to display 5 different colors and make it data responsive
             var threshold = d3.scaleThreshold()
                             .domain([0, Math.round(100*maxData/4)/100,
                             Math.round(100*2*(maxData/4))/100, Math.round(100*3*(maxData/4))/100,
                             Math.round(100*maxData)/100])
                             .range(['white','red'])
             
-            console.log(threshold.domain())
+            /* We create two empty arrays in order to store the threshold value and the corresponding color, to be
+            used in the legend */
             var color_array = []
             var label_array = []
             threshold.domain().forEach((d, i)=>{
@@ -169,7 +152,9 @@ path.state {
                 label_array.push(Math.round(d*100)+'%')
                 color_array.push(colorScale(d))
             })
-            console.log(label_array)
+
+            /* We create the svg for the legend and append g, as well as the attributes we wish to use, such as the 
+            threshold values and colors. We have used Susie Lu's amazing work: https://d3-legend.susielu.com/*/
             var svgLegend = d3.select('#legend')
 
             svgLegend.append('g')
@@ -189,68 +174,72 @@ path.state {
             svgLegend.select('.legendLinear')
                     .call(legendLinear)
             
-            const svg = d3.select('#tooltip')
-                .append('svg')
+            // We create a containter to house the div of our tooltip and give it desired attributes
+            var svgContainer = d3.select('#viz')
 
-            const Tooltip = d3.select('#Tooltip')
+            var svg = svgContainer.append('svg')
+                .attr('id','viz')
+            
+            var tooltip = d3.select('body')
                 .append('div')
-                .attr('class','Tooltip')
-                .style("opacity", 1)
+                .attr('class','tooltip')
+                .style("opacity", 0)
                 .style("background-color", "black")
                 .style("border", "solid")
                 .style("border-width", "2px")
                 .style("border-radius", "5px")
                 .style("padding", "5px")
 
-            d3.select('#canvas').selectAll('path')
-                    .data(mxData)
-                    .enter()
-                    .append('path')
-                    .attr('d',d3.geoPath().projection(projection))
-                    .attr('class','county')
-                    .attr('stroke','black')
-                    .attr('stroke-width', 0.5)
-                    .attr('fill', (mxDataItem)=>{
-                        let mx_name = mxDataItem.properties.state_name
-                        let state = illitData.find((item) =>{
-                            return item['Entidad federativa'] === mx_name
-                        })
-                        let percentage = state['Porcentaje_analfabetismo']
-                        return colorScale(percentage)
+            /* We create the map and apply the previously defined path as well as the fill using the colorScale to color it
+            based on the data*/
+            svg.selectAll('path')
+                .data(mxData)
+                .enter()
+                .append('path')
+                .attr('d',path)
+                .attr('class','county')
+                .attr('stroke','black')
+                .attr('fill', (mxDataItem)=>{
+                    /* We look for the state name in the json and look for the same name in the csv, in order to extract the
+                    percentage column value to apply a colorScale to it and color states based on its value*/
+                    let mx_name = mxDataItem.properties.state_name
+                    let state = illitData.find((item) =>{
+                        return item['Entidad federativa'] === mx_name
                     })
-                    .on('mouseover', (d)=>{
-                        Tooltip.style('opacity',1)
-                        let mx_name = d.target.__data__.properties.state_name
-                        let state = illitData.find((item) =>{
-                            return item['Entidad federativa'] === mx_name
-                        })
-                        let percentage = state['Porcentaje_analfabetismo']
-                        Tooltip.html(state['Entidad federativa'] + '<br>' + '% of illiteracy: ' + 
-                                Math.round(percentage*10000)/100  + '%')
-                            .style('left', (event.x)/2 + 'px')
-                            .style('top', (event.y)/2 - 30 + 'px)')
-                    })
-                    .on('mousemove', (d)=>{
-                        let mx_name = d.target.__data__.properties.state_name
-                        let state = illitData.find((item) =>{
-                            return item['Entidad federativa'] === mx_name
-                        })
-                        let percentage = state['Porcentaje_analfabetismo']
-                        Tooltip
-                            .html(state['Entidad federativa'] + '<br>' + '% of illiteracy: ' + 
-                                Math.round(percentage*10000)/100  + '%')
-                            .style('left', (event.x)/2 + 'px')
-                            .style('top', (event.y)/2 - 30 + 'px)')
-                    })
-                    .on('mouseout', (item)=>{
-                        Tooltip.style('opacity',0)
-                    })
-                    console.log('domain')
-                    console.log(colorScale.domain())
-                }
-    
-// start python server: python -m http.server 8888 &
-// cd on root folder first (of file)
+                    let percentage = state['Porcentaje_analfabetismo']
+                    return colorScale(percentage)
+                })
+                .on('mouseover', (event, d) =>{
+                    tooltip.style('opacity',1)
+                })
+                .on('mousemove', (event, d) =>{
+                    /* We do the same process when coloring the states, but now we present the data using a html tooltip
+                    element that gets the mouse location through the d3.pointer. We also use the number formatting used before*/
+                    const[x,y] = d3.pointer(event)
+                    let mx_name = d.properties.state_name
+                    let state = illitData.find((item) =>{
+                        return item['Entidad federativa'] === mx_name
+                })
+                    let percentage = state['Porcentaje_analfabetismo']
+                    tooltip.html(state['Entidad federativa'] + '<br>' + '% of illiteracy: ' + 
+                        Math.round(percentage*10000)/100  + '%' + '<br>' + 'Literate: ' + numFor.format(state['Alfabeta']) + 
+                        '<br>' + 'Illiterate: ' + numFor.format(state['Analfabeta']) + '<br>' + 'Not specified: ' + 
+                        numFor.format(state['No especificado']))
+                        .style('left', (event.clientX)  + 'px')
+                        .style('top', (event.clientY) -80 + 'px')
+                })
+                .on('mouseout', (event, d) =>{
+                    const[x,y] = d3.pointer(event)
+                    tooltip.transition()
+                        .duration(200)
+                        .delay(100)
+                    tooltip.style('opacity',0)
+                })
+            
+            }
+
+/* This is the data loading part, where the data is passed to the console if succesful, or if not, an error is passed to the
+console as well. The drawMap function is called if everything is ok*/
         d3.json(mxURL).then((data,error)=>{
                 if(error){
                     console.log(log)
@@ -274,7 +263,5 @@ path.state {
                 }
             }
         )
-
     </script>
 </html>
-
