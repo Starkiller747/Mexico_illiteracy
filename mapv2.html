@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js" integrity="sha256-tHoAPGoNdhIR28YHl9DWLzeRfdwigkH7OCBXMrHXhoM=" crossorigin="anonymous"></script>
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
+        <title>Mapa de Mexico</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro&display=swap');
+
+*{
+    font-family: 'Source Sans Pro', sans-serif;
+}
+
+html, body{
+    min-height: 100%
+}
+
+body {
+    background-color: #2A2D2D;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #FDF1E7;
+    margin: none;
+}
+
+svg{
+    background-color: #305555;
+    box-shadow: 0px 3px 150px rgba(0,0,0,0.2);
+    border-radius: 5px;
+    border-radius: 5px;
+}
+
+#canvas{
+    min-height: 600px;
+    min-width: 950px;
+}
+
+/* 
+.county:hover{
+    fill: gray;
+}
+ */
+g{
+    color: #FDF1E7
+}
+
+#tooltip{
+    opacity: 0;
+    height: auto;
+    width: auto;
+    color: black
+/*     margin-top: 2px;
+    color: #FDF1E7;
+    font-size: 24px;
+    margin-bottom: 5px; */
+}
+
+#legend{
+    color: rgb(255, 255, 255);
+    font-size: 18px;
+    text-align: left;
+    height: 100px;
+    width: 590px;
+    margin: 5px 650px 5px 290px;
+}
+
+path.land {
+    fill: #eee;
+    stroke: #ddd;
+}
+
+path.state {
+    stroke: rgb(0, 0, 0);
+    stroke-width: 20;
+}
+
+
+#title{
+    font-size: 28px;
+    color: #FDF1E7;
+    text-transform: uppercase;
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+
+#description a{
+    text-decoration: none;
+    color: #FDF1E7;
+    text-align: center;
+}
+
+#container{
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+#rightSide{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-left: 50px;
+}
+#source{
+    display:flex;
+    justify-content:right;
+    padding-left: 600px;
+}
+.legendLinear text{
+    fill: white
+}
+
+        </style>
+    </head>
+    <body>
+        <h2 id="title">Illiteracy in Mexico</h2>
+        <div id="description">Illiteracy status of people 15 and over</div>
+        <svg id="legend"></svg>
+        <svg id="canvas"></svg>
+        <div id="source">Source: INEGI, Censo de Población y Vivienda 2020.</div>
+        <div id="Tooltip"></div> 
+    </body>
+    <script>
+        //let mxURL = 'https://gist.githubusercontent.com/mbostock/c4c27dc3724e1ad3d680a581079b2e9c/raw/835560b9dae2b00dcfefdb53f2465c44cbbbcb03/mx.json'
+        //let mxURL = 'https://cdn.freecodecamp.org/testable-projects-fcc/data/choropleth_map/counties.json'
+        //let mxURL = 'https://raw.githubusercontent.com/piwodlaiwo/TopoJSON-Data/master/diva-gis/ESP_adm/ESP_adm1.topo.json'
+        let mxURL = 'https://raw.githubusercontent.com/Traze3/Mexico_illiteracy/main/mx_topojson.json'
+        let illitURL = 'https://raw.githubusercontent.com/Traze3/Mexico_illiteracy/main/analfabetismo.csv'
+        //let illitURL = "http://localhost:8888/analfabetismo.csv"
+
+        let mxData
+        let illitData
+
+        var projection = d3.geoMercator()
+                            .scale(1700)
+                            .center([-102,25.5])
+
+        let drawMap = () =>{
+
+            /*In the following part, the maximum and minimum values of the csv are extracted to be used in the domain of our
+            color scale function in order to color de states dinamically and based on the entire dataset.*/
+            var maxData = d3.max(illitData, (d) =>{
+                                    return d.Porcentaje_analfabetismo
+                                })
+            var minData = d3.min(illitData, (d) =>{
+                return d.Porcentaje_analfabetismo
+            })
+            var colorScale = d3.scaleLinear()
+                            .domain([minData,maxData])
+                            .range(['white','red'])
+                            .interpolate(d3.interpolateRgb)
+
+            var threshold = d3.scaleThreshold()
+                            .domain([0, Math.round(100*maxData/4)/100,
+                            Math.round(100*2*(maxData/4))/100, Math.round(100*3*(maxData/4))/100,
+                            Math.round(100*maxData)/100])
+                            .range(['white','red'])
+            
+            console.log(threshold.domain())
+            var color_array = []
+            var label_array = []
+            threshold.domain().forEach((d, i)=>{
+                console.log(d + ' ' + colorScale(d))
+                label_array.push(Math.round(d*100)+'%')
+                color_array.push(colorScale(d))
+            })
+            console.log(label_array)
+            var svgLegend = d3.select('#legend')
+
+            svgLegend.append('g')
+                .attr('class','legendLinear')
+                .attr('transform','translate(20,30)')
+            
+            var legendLinear = d3.legendColor()
+                .labels(label_array)
+                .labelFormat(d3.format('.0f'))
+                .title('Illiteracy status of people 15 and over')
+                .shapeWidth(110)
+                .cells([threshold.domain()[0],threshold.domain()[1],threshold.domain()[2],threshold.domain()[3],
+                threshold.domain()[4]])
+                .orient('horizontal')
+                .scale(colorScale)
+
+            svgLegend.select('.legendLinear')
+                    .call(legendLinear)
+            
+            const svg = d3.select('#tooltip')
+                .append('svg')
+
+            const Tooltip = d3.select('#Tooltip')
+                .append('div')
+                .attr('class','Tooltip')
+                .style("opacity", 1)
+                .style("background-color", "black")
+                .style("border", "solid")
+                .style("border-width", "2px")
+                .style("border-radius", "5px")
+                .style("padding", "5px")
+
+            d3.select('#canvas').selectAll('path')
+                    .data(mxData)
+                    .enter()
+                    .append('path')
+                    .attr('d',d3.geoPath().projection(projection))
+                    .attr('class','county')
+                    .attr('stroke','black')
+                    .attr('stroke-width', 0.5)
+                    .attr('fill', (mxDataItem)=>{
+                        let mx_name = mxDataItem.properties.state_name
+                        let state = illitData.find((item) =>{
+                            return item['Entidad federativa'] === mx_name
+                        })
+                        let percentage = state['Porcentaje_analfabetismo']
+                        return colorScale(percentage)
+                    })
+                    .on('mouseover', (d)=>{
+                        Tooltip.style('opacity',1)
+                        let mx_name = d.target.__data__.properties.state_name
+                        let state = illitData.find((item) =>{
+                            return item['Entidad federativa'] === mx_name
+                        })
+                        let percentage = state['Porcentaje_analfabetismo']
+                        Tooltip.html(state['Entidad federativa'] + '<br>' + '% of illiteracy: ' + 
+                                Math.round(percentage*10000)/100  + '%')
+                            .style('left', (event.x)/2 + 'px')
+                            .style('top', (event.y)/2 - 30 + 'px)')
+                    })
+                    .on('mousemove', (d)=>{
+                        let mx_name = d.target.__data__.properties.state_name
+                        let state = illitData.find((item) =>{
+                            return item['Entidad federativa'] === mx_name
+                        })
+                        let percentage = state['Porcentaje_analfabetismo']
+                        Tooltip
+                            .html(state['Entidad federativa'] + '<br>' + '% of illiteracy: ' + 
+                                Math.round(percentage*10000)/100  + '%')
+                            .style('left', (event.x)/2 + 'px')
+                            .style('top', (event.y)/2 - 30 + 'px)')
+                    })
+                    .on('mouseout', (item)=>{
+                        Tooltip.style('opacity',0)
+                    })
+                    console.log('domain')
+                    console.log(colorScale.domain())
+                }
+    
+// start python server: python -m http.server 8888 &
+// cd on root folder first (of file)
+        d3.json(mxURL).then((data,error)=>{
+                if(error){
+                    console.log(log)
+                }else{
+                    mxData = data
+                    mxData = topojson.feature(mxData, mxData.objects.states).features;
+                    console.log('MX Data');
+                    console.log(mxData);
+
+                    d3.csv(illitURL).then((data,error) => {
+                            if(error){
+                                console.log(error)
+                            }else{
+                                illitData = data;
+                                console.log('Illiteracy data');
+                                console.log(illitData);
+                                drawMap();
+                            }
+                        }
+                    )
+                }
+            }
+        )
+
+    </script>
+</html>
+
