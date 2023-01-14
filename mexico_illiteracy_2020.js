@@ -19,10 +19,10 @@
      color scale function in order to color de states dinamically and based on the entire dataset.*/
 
      var maxData = d3.max(illitData, (d) =>{
-                             return d.Porcentaje_analfabetismo
+                             return d.Analfabeta/d.Total
                          })
      var minData = d3.min(illitData, (d) =>{
-         return d.Porcentaje_analfabetismo
+         return d.Analfabeta/d.Total
      })
      var colorScale = d3.scaleLinear()
                      .domain([minData,maxData])
@@ -102,7 +102,7 @@
              let percentage = state['Analfabeta'] / state['Total']
              return colorScale(percentage)
          })
-         .on('mouseover', (event, d) =>{
+         .on('mouseover', (d) =>{
              tooltip.style('opacity',1)
          }) 
          .on('mousemove', (event, d) =>{
